@@ -1,6 +1,6 @@
 {
   "name": "serve-wasm-http",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A simple http server that also delivers the expected mime type for WASM.",
   "bin": {
     "serve-wasm-http" : "./bin/wasm_server.js"
