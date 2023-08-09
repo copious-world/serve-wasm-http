@@ -4,6 +4,7 @@
 // viewing data server
 //
 const fs = require('fs')
+const path = require('path')
 const polka = require('polka')
 const send = require('@polka/send-type');
 //
@@ -36,26 +37,27 @@ function ext_to_mimetype(ext) {
 }
 
 function mime_type_from_ext(file) {
-    let ext = "html"
+
     let mime_type = "text/html"
 
-    let tmp_ext_pos = file.lastIndexOf('.')
-    if ( tmp_ext_pos > 0 ) {
-        ext = file.substring(tmp_ext_pos+1)
+    let fname_syntax = path.parse(file)
+    let fname = fname_syntax.name
+    let ext = fname_syntax.ext
+    if ( ext.length > 0 ) {
+        ext = ext.substring(1)
         mime_type = ext_to_mimetype(ext)
     } else {
         ext = ""
         mime_type = "text/plain"
     }
 
-    return [mime_type,ext]
+    return [mime_type,fname,ext]
 }
 
 
 function mime_type_from_dir_or_ext(asset_dir,file) {
 
-    let ext = "html"
-    let mime_type = "text/html"
+    let [mime_type,fname,ext] = mime_type_from_ext(file)
 
     switch ( asset_dir ) {
         case "js" : {
@@ -73,43 +75,48 @@ function mime_type_from_dir_or_ext(asset_dir,file) {
             mime_type = 'application/wasm'
             break;
         }
-        case "assets" : {
-            return mime_type_from_ext(file)
-        }
-        case "test" : {
-            return mime_type_from_ext(file)
-        }
+        case "assets" :
+        case "test" : 
         default: {
-            return mime_type_from_ext(file)
+            break
         }
     }
 
-    return [mime_type,ext]
+    return [mime_type,fname,ext]
 }
 
 
 // ---- ---- ---- ---- HTML APPLICATION PATHWAYS  ---- ---- ---- ---- ---- ---- ----
 
-app.get('/',(req, res) => {
+app.get('/',async (req, res) => {
     try {
-        const stream = fs.createReadStream('./index.html')
+        const fpath = './index.html'
+        let check = fs.statSync(fpath)
+        if ( check.isFile() ) {
+            const stream = fs.createReadStream(fpath)
+            send(res,200,stream,{ 'Content-Type': mime_type })     
+        } else {
+            send(res,404,"what")
+        }
         send(res,200,stream,{ 'Content-Type': 'text/html' })
     } catch (e) {
-        send(res,404,"what")    
+        console.log(process.cwd(),'no ./index.html')
+        send(res,404,"what")
     }
 })
 
 
-app.get('/:file',(req, res) => {
+app.get('/:file',async (req, res) => {
     let file = req.params.file
     try {
-        let [mime_type,ext] = mime_type_from_ext(file)
-        if ( ext.length ) {
-            const stream = fs.createReadStream(`./${file}.${ext}`)
-            send(res,200,stream,{ 'Content-Type': mime_type })    
+        let [mime_type,fname,ext] = mime_type_from_ext(file)
+        const fpath = `./${fname}.${ext}`
+        let check = fs.statSync(fpath)
+        if ( check.isFile() ) {
+            const stream = fs.createReadStream(fpath)
+            send(res,200,stream,{ 'Content-Type': mime_type })     
         } else {
-            const stream = fs.createReadStream(`./${file}`)
-            send(res,200,stream,{ 'Content-Type': mime_type })
+            send(res,404,"what")
         }
     } catch (e) {
         send(res,404,"what")    
@@ -118,14 +125,22 @@ app.get('/:file',(req, res) => {
 
 
 
-app.get('/:assets/:file',(req, res) => {
+app.get('/:assets/:file',async (req, res) => {
     let asset_dir = req.params.assets
     let file = req.params.file
     try {
-        let [mime_type,ext] = mime_type_from_dir_or_ext(asset_dir,file)
-        const stream = fs.createReadStream(`./${asset_dir}/${file}.${ext}`)
-        send(res,200,stream,{ 'Content-Type': mime_type })
+        //        console.log(asset_dir,file)
+        let [mime_type,fname,ext] = mime_type_from_dir_or_ext(asset_dir,file)
+        let fpath = `./${asset_dir}/${fname}.${ext}`
+        let check = fs.statSync(fpath)
+        if ( check.isFile() ) {
+            const stream = fs.createReadStream(fpath)
+            send(res,200,stream,{ 'Content-Type': mime_type })     
+        } else {
+            send(res,404,"what")
+        }
     } catch (e) {
+        console.log(e)
         send(res,404,"what")    
     }
 })
